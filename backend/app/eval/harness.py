@@ -2,14 +2,13 @@
 Eval harness — two phases:
 
 1. QA generation: given ingested chunks, ask an LLM to produce question/answer
-   pairs with ground-truth chunk IDs. Stored in /tmp/chatdoc_eval_dataset.json.
+   pairs with ground-truth chunk IDs. Stored in /app/data/eval_dataset.json.
 
 2. Eval run:
    a. Retrieval eval — recall@k and MRR@k (our own metrics, no RAGAS needed).
    b. Generation eval — RAGAS faithfulness + answer_relevancy on the RAG answers.
 """
 import json
-from pathlib import Path
 
 from qdrant_client import AsyncQdrantClient
 
@@ -18,7 +17,8 @@ from app.eval.metrics import compute_retrieval_metrics, RetrievalMetrics
 from app.ingestion.indexer import load_bm25_store
 from app.retrieval.hybrid import hybrid_search
 
-EVAL_DATASET_PATH = Path("/tmp/chatdoc_eval_dataset.json")
+from app.ingestion.indexer import DATA_DIR
+EVAL_DATASET_PATH = DATA_DIR / "eval_dataset.json"
 
 
 async def generate_qa_dataset(settings: Settings, num_pairs: int = 20) -> list[dict]:

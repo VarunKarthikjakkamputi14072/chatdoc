@@ -14,7 +14,9 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from app.core.config import Settings
 from app.ingestion.chunker import Chunk
 
-BM25_STORE_PATH = Path("/tmp/chatdoc_bm25.json")
+DATA_DIR = Path("/app/data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+BM25_STORE_PATH = DATA_DIR / "bm25_store.json"
 
 
 async def ensure_collection(settings: Settings) -> None:

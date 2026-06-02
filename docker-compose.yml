@@ -22,7 +22,7 @@ services:
       qdrant:
         condition: service_healthy
     volumes:
-      - bm25_store:/tmp
+      - chatdoc_data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -39,4 +39,4 @@ services:
 
 volumes:
   qdrant_data:
-  bm25_store:
+  chatdoc_data:
