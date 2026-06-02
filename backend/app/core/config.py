@@ -6,11 +6,29 @@ class Settings(BaseSettings):
     app_name: str = "ChatDoc"
     debug: bool = False
 
-    # LLM
+    # --- Providers (pluggable) ---
+    # LLM: "openai" (default) | "groq"
+    llm_provider: str = "openai"
+    # Embeddings: "openai" (default) | "local" (fastembed, no API key)
+    embed_provider: str = "openai"
+
+    # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
+
+    # Generation temperature (low = grounded, terse answers)
+    llm_temperature: float = 0.1
+
+    # Groq (OpenAI-compatible; LLM inference only — no embeddings)
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+
+    # Local embeddings (fastembed / ONNX, runs offline)
+    local_embed_model: str = "BAAI/bge-small-en-v1.5"
+    local_embed_dim: int = 384
 
     # Qdrant
     qdrant_host: str = "localhost"
@@ -31,6 +49,10 @@ class Settings(BaseSettings):
     eval_top_k: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    def vector_size(self) -> int:
+        """Embedding dimensionality for the active embed provider."""
+        return self.local_embed_dim if self.embed_provider == "local" else self.embed_dim
 
 
 @lru_cache

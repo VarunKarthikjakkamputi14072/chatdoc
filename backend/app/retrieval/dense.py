@@ -5,20 +5,18 @@ from app.core.config import Settings
 
 
 async def dense_search(query: str, settings: Settings, client: AsyncQdrantClient) -> list[dict]:
-    from openai import AsyncOpenAI
+    from app.embeddings import embed_query
 
-    oai = AsyncOpenAI(api_key=settings.openai_api_key)
-    resp = await oai.embeddings.create(model=settings.embed_model, input=[query])
-    query_vector = resp.data[0].embedding
+    query_vector = await embed_query(query, settings)
 
-    results = await client.search(
+    response = await client.query_points(
         collection_name=settings.qdrant_collection,
-        query_vector=query_vector,
+        query=query_vector,
         limit=settings.top_k_dense,
         with_payload=True,
     )
 
     return [
         {"id": str(r.id), "text": r.payload["text"], "source": r.payload["source"], "score": r.score}
-        for r in results
+        for r in response.points
     ]

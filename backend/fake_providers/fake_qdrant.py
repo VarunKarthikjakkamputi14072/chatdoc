@@ -25,6 +25,11 @@ class _ScoredPoint:
 
 
 @dataclass
+class _QueryResponse:
+    points: list
+
+
+@dataclass
 class FakeQdrant:
     _store: list[dict] = field(default_factory=list)
 
@@ -44,20 +49,20 @@ class FakeQdrant:
                 "payload": p.payload,
             })
 
-    async def search(
+    async def query_points(
         self,
         _collection_name: str,
-        query_vector: list[float],
+        query: list[float],
         limit: int = 5,
         with_payload: bool = True,  # noqa: ARG002
-    ) -> list[_ScoredPoint]:
+    ) -> _QueryResponse:
         scored = [
             _ScoredPoint(
                 id=item["id"],
-                score=_cosine(query_vector, item["vector"]),
+                score=_cosine(query, item["vector"]),
                 payload=item["payload"],
             )
             for item in self._store
         ]
         scored.sort(key=lambda x: x.score, reverse=True)
-        return scored[:limit]
+        return _QueryResponse(points=scored[:limit])

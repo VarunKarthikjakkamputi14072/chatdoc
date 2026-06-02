@@ -35,7 +35,14 @@ async def generate_qa_dataset(settings: Settings, num_pairs: int = 20) -> list[d
     import random
     sample = random.sample(store, min(num_pairs, len(store)))
 
-    oai = AsyncOpenAI(api_key=settings.openai_api_key)
+    # Route QA generation through the configured chat provider. Groq exposes an
+    # OpenAI-compatible endpoint, so the same client works for both.
+    if settings.llm_provider == "groq":
+        oai = AsyncOpenAI(api_key=settings.groq_api_key, base_url=settings.groq_base_url)
+        chat_model = settings.groq_model
+    else:
+        oai = AsyncOpenAI(api_key=settings.openai_api_key)
+        chat_model = settings.openai_model
     dataset = []
 
     for item in sample:
@@ -46,7 +53,7 @@ async def generate_qa_dataset(settings: Settings, num_pairs: int = 20) -> list[d
             f"Excerpt:\n{item['text'][:800]}"
         )
         resp = await oai.chat.completions.create(
-            model=settings.openai_model,
+            model=chat_model,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.3,

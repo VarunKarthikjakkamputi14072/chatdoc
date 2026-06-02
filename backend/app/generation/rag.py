@@ -17,26 +17,42 @@ from app.core.config import Settings
 from app.retrieval.hybrid import hybrid_search
 
 SYSTEM_PROMPT = """\
-You are a helpful assistant that answers questions strictly based on the provided document excerpts.
-If the answer is not in the excerpts, say you don't know — do not make up information.
-Always cite the source document name at the end of your answer in brackets, e.g. [source: report.pdf].
+You answer questions using only the provided document excerpts.
+
+Rules:
+- Lead with the answer. Be direct and concise — usually 1-3 sentences.
+- No preamble, no restating the question, no meta-commentary about the excerpts
+  (never say things like "it appears", "based on the context", or "the excerpts show").
+- Use a short bulleted list only when enumerating multiple concrete items.
+- If the excerpts do not contain the answer, reply exactly: "I don't know based on the provided documents." Do not speculate or add suggestions.
+- Never invent facts or sources. Source citations are attached separately, so do not append them yourself.
 """
 
 QA_TEMPLATE = PromptTemplate(
-    "Context excerpts:\n"
+    "Use only these document excerpts to answer.\n"
     "---------------------\n"
     "{context}\n"
     "---------------------\n"
     "Question: {query}\n"
-    "Answer:"
+    "Answer directly and concisely:"
 )
 
 
 def _build_llm(settings: Settings) -> LLM:
+    if settings.llm_provider == "groq":
+        from llama_index.llms.groq import Groq
+
+        return Groq(
+            model=settings.groq_model,
+            api_key=settings.groq_api_key,
+            system_prompt=SYSTEM_PROMPT,
+            temperature=settings.llm_temperature,
+        )
     return OpenAI(
         model=settings.openai_model,
         api_key=settings.openai_api_key,
         system_prompt=SYSTEM_PROMPT,
+        temperature=settings.llm_temperature,
     )
 
 

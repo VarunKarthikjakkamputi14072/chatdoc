@@ -32,17 +32,14 @@ async def ensure_collection(settings: Settings) -> None:
     if settings.qdrant_collection not in existing:
         await client.create_collection(
             collection_name=settings.qdrant_collection,
-            vectors_config=VectorParams(size=settings.embed_dim, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=settings.vector_size(), distance=Distance.COSINE),
         )
 
 
 async def embed_chunks(chunks: list[Chunk], settings: Settings) -> list[list[float]]:
-    from openai import AsyncOpenAI
+    from app.embeddings import embed_texts
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    texts = [c.text for c in chunks]
-    response = await client.embeddings.create(model=settings.embed_model, input=texts)
-    return [item.embedding for item in response.data]
+    return await embed_texts([c.text for c in chunks], settings)
 
 
 async def index_chunks(chunks: list[Chunk], settings: Settings) -> list[str]:
