@@ -30,6 +30,7 @@ class RetrievalEvalResponse(BaseModel):
 class RagasEvalResponse(BaseModel):
     faithfulness: float
     answer_relevancy: float
+    context_precision: float
     num_samples: int
 
 

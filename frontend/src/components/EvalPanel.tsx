@@ -112,6 +112,10 @@ export default function EvalPanel() {
                 <div style={styles.metricLabel}>Answer Relevancy</div>
                 <div style={styles.metricValue}>{ragas.answer_relevancy.toFixed(3)}</div>
               </div>
+              <div style={styles.metric}>
+                <div style={styles.metricLabel}>Context Precision</div>
+                <div style={styles.metricValue}>{ragas.context_precision.toFixed(3)}</div>
+              </div>
             </>
           )}
         </div>

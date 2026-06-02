@@ -5,6 +5,7 @@ Writes chunks into two indexes:
      persisted to disk as JSON so it survives restarts.
 """
 import json
+import os
 import uuid
 from pathlib import Path
 
@@ -14,9 +15,15 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from app.core.config import Settings
 from app.ingestion.chunker import Chunk
 
-DATA_DIR = Path("/app/data")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Where the BM25 store + eval dataset live. Defaults to the Docker volume
+# mount (/app/data); override with CHATDOC_DATA_DIR for local dev and tests.
+DATA_DIR = Path(os.getenv("CHATDOC_DATA_DIR", "/app/data"))
 BM25_STORE_PATH = DATA_DIR / "bm25_store.json"
+
+
+def ensure_data_dir() -> None:
+    """Create the data directory on demand (not at import time)."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def ensure_collection(settings: Settings) -> None:
@@ -76,6 +83,7 @@ def _append_bm25_store(chunks: list[Chunk], ids: list[str]) -> None:
     for chunk, chunk_id in zip(chunks, ids):
         store.append({"id": chunk_id, "text": chunk.text, "source": chunk.source})
 
+    ensure_data_dir()
     BM25_STORE_PATH.write_text(json.dumps(store))
 
 

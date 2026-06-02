@@ -8,18 +8,19 @@ interface Message {
   sources?: ChatResponse["sources"];
 }
 
+const bubbleStyle = (role: "user" | "assistant"): React.CSSProperties => ({
+  maxWidth: "75%",
+  alignSelf: role === "user" ? "flex-end" : "flex-start",
+  background: role === "user" ? "#1e3a5f" : "#1e1e1e",
+  borderRadius: "12px",
+  padding: "0.75rem 1rem",
+  lineHeight: 1.6,
+  fontSize: "0.9rem",
+});
+
 const styles: Record<string, React.CSSProperties> = {
   container: { display: "flex", flexDirection: "column", height: "100%" },
   messages: { flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" },
-  bubble: (role: "user" | "assistant"): React.CSSProperties => ({
-    maxWidth: "75%",
-    alignSelf: role === "user" ? "flex-end" : "flex-start",
-    background: role === "user" ? "#1e3a5f" : "#1e1e1e",
-    borderRadius: "12px",
-    padding: "0.75rem 1rem",
-    lineHeight: 1.6,
-    fontSize: "0.9rem",
-  }),
   sources: {
     marginTop: "0.5rem",
     fontSize: "0.78rem",
@@ -81,8 +82,12 @@ export default function ChatPanel({ hasDocuments }: Props) {
     setMessages((prev) => [...prev, assistantMsg]);
 
     try {
-      for await (const token of chatStream(userMsg.content)) {
-        assistantMsg.content += token;
+      for await (const event of chatStream(userMsg.content)) {
+        if (event.type === "token") {
+          assistantMsg.content += event.value;
+        } else if (event.type === "sources") {
+          assistantMsg.sources = event.value;
+        }
         setMessages((prev) => [
           ...prev.slice(0, -1),
           { ...assistantMsg },
@@ -105,7 +110,7 @@ export default function ChatPanel({ hasDocuments }: Props) {
       ) : (
         <div style={styles.messages}>
           {messages.map((msg, i) => (
-            <div key={i} style={styles.bubble(msg.role)}>
+            <div key={i} style={bubbleStyle(msg.role)}>
               <ReactMarkdown>{msg.content}</ReactMarkdown>
               {msg.sources && msg.sources.length > 0 && (
                 <div style={styles.sources}>

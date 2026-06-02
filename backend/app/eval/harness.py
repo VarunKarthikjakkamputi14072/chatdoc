@@ -14,10 +14,9 @@ from qdrant_client import AsyncQdrantClient
 
 from app.core.config import Settings
 from app.eval.metrics import compute_retrieval_metrics, RetrievalMetrics
-from app.ingestion.indexer import load_bm25_store
+from app.ingestion.indexer import DATA_DIR, ensure_data_dir, load_bm25_store
 from app.retrieval.hybrid import hybrid_search
 
-from app.ingestion.indexer import DATA_DIR
 EVAL_DATASET_PATH = DATA_DIR / "eval_dataset.json"
 
 
@@ -64,6 +63,7 @@ async def generate_qa_dataset(settings: Settings, num_pairs: int = 20) -> list[d
         except (KeyError, json.JSONDecodeError):
             continue
 
+    ensure_data_dir()
     EVAL_DATASET_PATH.write_text(json.dumps(dataset, indent=2))
     return dataset
 
@@ -90,11 +90,11 @@ async def run_retrieval_eval(settings: Settings, qdrant: AsyncQdrantClient) -> R
 
 async def run_ragas_eval(settings: Settings, qdrant: AsyncQdrantClient) -> dict:
     """
-    Runs RAGAS faithfulness + answer_relevancy.
+    Runs RAGAS faithfulness + answer_relevancy + context_precision.
     Returns per-metric averages.
     """
     from ragas import evaluate
-    from ragas.metrics import faithfulness, answer_relevancy
+    from ragas.metrics import faithfulness, answer_relevancy, context_precision
     from datasets import Dataset
     from app.generation.rag import answer
 
@@ -104,17 +104,20 @@ async def run_ragas_eval(settings: Settings, qdrant: AsyncQdrantClient) -> dict:
 
     rows = {"question": [], "answer": [], "contexts": [], "ground_truth": []}
     for item in dataset_raw:
+        # Retrieve once and reuse the same contexts for both the generated
+        # answer and the context_precision metric.
+        chunks = await hybrid_search(item["question"], settings, qdrant)
         result = await answer(item["question"], settings, qdrant)
         rows["question"].append(item["question"])
         rows["answer"].append(result["answer"])
-        rows["contexts"].append([c["text"] for c in
-                                  await hybrid_search(item["question"], settings, qdrant)])
+        rows["contexts"].append([c["text"] for c in chunks])
         rows["ground_truth"].append(item["answer"])
 
     ds = Dataset.from_dict(rows)
-    result = evaluate(ds, metrics=[faithfulness, answer_relevancy])
+    result = evaluate(ds, metrics=[faithfulness, answer_relevancy, context_precision])
     return {
         "faithfulness": float(result["faithfulness"]),
         "answer_relevancy": float(result["answer_relevancy"]),
+        "context_precision": float(result["context_precision"]),
         "num_samples": len(dataset_raw),
     }

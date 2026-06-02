@@ -1,3 +1,10 @@
+import os
+import tempfile
+
+# Point the data dir at a throwaway temp dir before any app module imports it,
+# so tests never read/write the real /app/data volume.
+os.environ.setdefault("CHATDOC_DATA_DIR", tempfile.mkdtemp(prefix="chatdoc-test-"))
+
 import pytest
 from fastapi.testclient import TestClient
 

@@ -6,7 +6,7 @@ VectorStoreIndex so our hybrid retriever (RRF fusion) stays in control of
 what goes into context — LlamaIndex just handles prompt construction and
 the streaming LLM call.
 """
-from typing import AsyncIterator
+from typing import AsyncIterator, Tuple
 
 from llama_index.core import PromptTemplate
 from llama_index.core.llms import LLM
@@ -47,19 +47,31 @@ def _format_context(chunks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-async def answer_stream(
+def _format_sources(chunks: list[dict]) -> list[dict]:
+    return [{"source": c["source"], "chunk_index": c.get("chunk_index")} for c in chunks]
+
+
+async def stream_answer(
     query: str,
     settings: Settings,
     qdrant: AsyncQdrantClient,
-) -> AsyncIterator[str]:
+) -> Tuple[list[dict], AsyncIterator[str]]:
+    """
+    Retrieves the supporting chunks once, then returns
+    (sources, token_iterator). The caller streams the tokens and can emit the
+    sources whenever it likes — no shared/global state between requests.
+    """
     chunks = await hybrid_search(query, settings, qdrant)
     context = _format_context(chunks)
     prompt = QA_TEMPLATE.format(context=context, query=query)
-
     llm = _build_llm(settings)
-    stream = await llm.astream_complete(prompt)
-    async for delta in stream:
-        yield delta.delta
+
+    async def tokens() -> AsyncIterator[str]:
+        stream = await llm.astream_complete(prompt)
+        async for delta in stream:
+            yield delta.delta
+
+    return _format_sources(chunks), tokens()
 
 
 async def answer(
@@ -75,6 +87,6 @@ async def answer(
     response = await llm.acomplete(prompt)
     return {
         "answer": response.text,
-        "sources": [{"source": c["source"], "chunk_index": c.get("chunk_index")} for c in chunks],
+        "sources": _format_sources(chunks),
         "chunks_used": len(chunks),
     }

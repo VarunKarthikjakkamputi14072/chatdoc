@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, AsyncIterator
 
 from fastapi import APIRouter, Depends
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 
 from app.core.config import Settings, get_settings
 from app.core.deps import get_qdrant
-from app.generation.rag import answer, answer_stream
+from app.generation.rag import answer, stream_answer
 
 router = APIRouter()
 
@@ -22,6 +23,11 @@ class ChatResponse(BaseModel):
     chunks_used: int
 
 
+def _sse(data: dict) -> bytes:
+    """Encode a dict as a single Server-Sent Events frame."""
+    return f"data: {json.dumps(data)}\n\n".encode()
+
+
 @router.post("/", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
@@ -29,11 +35,21 @@ async def chat(
     qdrant=Depends(get_qdrant),
 ):
     if body.stream:
-        async def token_stream() -> AsyncIterator[bytes]:
-            async for token in answer_stream(body.query, settings, qdrant):
-                yield token.encode()
+        async def event_stream() -> AsyncIterator[bytes]:
+            # Emit answer tokens as they arrive, then a final frame carrying
+            # the source citations (the non-streaming path returns these too),
+            # followed by a [DONE] sentinel.
+            sources, tokens = await stream_answer(body.query, settings, qdrant)
+            async for token in tokens:
+                yield _sse({"type": "token", "value": token})
+            yield _sse({"type": "sources", "value": sources})
+            yield b"data: [DONE]\n\n"
 
-        return StreamingResponse(token_stream(), media_type="text/plain")
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     result = await answer(body.query, settings, qdrant)
     return ChatResponse(**result)

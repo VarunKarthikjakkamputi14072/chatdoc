@@ -19,11 +19,12 @@ After you ingest documents, the eval pipeline auto-generates QA pairs from your 
 - **MRR@5** — how high up the first relevant chunk is ranked
 - **RAGAS faithfulness** — does the generated answer stay grounded in retrieved context?
 - **RAGAS answer relevancy** — does the answer actually address the question?
+- **RAGAS context precision** — are the retrieved chunks actually relevant, or is noise leaking into context?
 
 No held-out test set needed. Works on whatever you upload.
 
 **LlamaIndex for orchestration (not raw API calls)**
-The query engine uses LlamaIndex's `PromptTemplate` + streaming `astream_complete`, keeping prompt construction and LLM calls cleanly separated from the retrieval logic.
+The query engine uses LlamaIndex's `PromptTemplate` + streaming `astream_complete`, keeping prompt construction and LLM calls cleanly separated from the retrieval logic. Answers stream to the browser over Server-Sent Events, with a trailing event carrying the source citations.
 
 ---
 
@@ -78,7 +79,7 @@ cd backend
 pytest
 ```
 
-Tests run with a fake in-memory Qdrant and no API keys. Covers: parsers, chunker, RRF fusion, BM25 search, recall@k / MRR@k math.
+Tests run with a fake in-memory Qdrant and no API keys. Covers: parsers, chunker, RRF fusion, BM25 search, recall@k / MRR@k math, and the SSE chat-streaming endpoint. Set `CHATDOC_DATA_DIR` to override the data path (the test suite points it at a temp dir automatically).
 
 ---
 
@@ -87,9 +88,9 @@ Tests run with a fake in-memory Qdrant and no API keys. Covers: parsers, chunker
 1. Upload documents via the UI or `POST /api/v1/ingest/file`
 2. Generate a QA dataset: click "Generate QA Dataset" in the Eval panel (or `POST /api/v1/eval/generate`)
 3. Run retrieval eval: `GET /api/v1/eval/retrieval` → recall@5, MRR@5
-4. Run RAGAS eval: `GET /api/v1/eval/ragas` → faithfulness, answer relevancy
+4. Run RAGAS eval: `GET /api/v1/eval/ragas` → faithfulness, answer relevancy, context precision
 
-The eval dataset persists to `/tmp/chatdoc_eval_dataset.json`. Re-run any time after adding more documents.
+The eval dataset persists to `$CHATDOC_DATA_DIR/eval_dataset.json` (defaults to `/app/data` inside Docker; set `CHATDOC_DATA_DIR` for local runs). Re-run any time after adding more documents.
 
 ---
 

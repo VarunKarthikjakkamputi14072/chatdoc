@@ -22,6 +22,7 @@ export interface RetrievalMetrics {
 export interface RagasMetrics {
   faithfulness: number;
   answer_relevancy: number;
+  context_precision: number;
   num_samples: number;
 }
 
@@ -53,7 +54,11 @@ export async function chat(query: string): Promise<ChatResponse> {
   return res.json();
 }
 
-export async function* chatStream(query: string): AsyncGenerator<string> {
+export type ChatStreamEvent =
+  | { type: "token"; value: string }
+  | { type: "sources"; value: ChatResponse["sources"] };
+
+export async function* chatStream(query: string): AsyncGenerator<ChatStreamEvent> {
   const res = await fetch(`${BASE}/chat/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -63,10 +68,28 @@ export async function* chatStream(query: string): AsyncGenerator<string> {
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  let buffer = "";
+
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
-    yield decoder.decode(value, { stream: true });
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE frames are separated by a blank line.
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+
+      const data = frame
+        .split("\n")
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5).trim())
+        .join("");
+      if (!data || data === "[DONE]") continue;
+
+      yield JSON.parse(data) as ChatStreamEvent;
+    }
   }
 }
 
