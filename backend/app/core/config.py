@@ -7,9 +7,9 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # --- Providers (pluggable) ---
-    # LLM: "openai" (default) | "groq"
+    # LLM: "openai" (default) | "groq" | "transit"
     llm_provider: str = "openai"
-    # Embeddings: "openai" (default) | "local" (fastembed, no API key)
+    # Embeddings: "openai" (default) | "local" (fastembed) | "transit"
     embed_provider: str = "openai"
 
     # OpenAI
@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
+
+    # Transit — self-hosted AI gateway. Set llm_provider/embed_provider to
+    # "transit" to route through one metered, cached af_ key (NVIDIA NIM behind
+    # it): repeated questions and re-embeds come straight from Transit's Redis
+    # cache for $0. OpenAI-compatible, so it's a base_url + key swap.
+    transit_base_url: str = "https://apiforge-jnwp.onrender.com/api/v1"
+    transit_api_key: str = ""
+    transit_model: str = "meta/llama-3.3-70b-instruct"
+    transit_embed_model: str = "nvidia/nv-embedqa-e5-v5"
+    transit_embed_dim: int = 1024
 
     # Generation temperature (low = grounded, terse answers)
     llm_temperature: float = 0.1
@@ -52,7 +62,11 @@ class Settings(BaseSettings):
 
     def vector_size(self) -> int:
         """Embedding dimensionality for the active embed provider."""
-        return self.local_embed_dim if self.embed_provider == "local" else self.embed_dim
+        if self.embed_provider == "local":
+            return self.local_embed_dim
+        if self.embed_provider == "transit":
+            return self.transit_embed_dim
+        return self.embed_dim
 
 
 @lru_cache

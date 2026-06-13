@@ -29,6 +29,17 @@ async def embed_texts(texts: list[str], settings: Settings) -> list[list[float]]
 
     from openai import AsyncOpenAI
 
+    if settings.embed_provider == "transit":
+        # Route through Transit (NVIDIA NIM embeddings, content-hash cached) —
+        # re-embedding identical chunks costs nothing on a cache hit.
+        client = AsyncOpenAI(
+            api_key=settings.transit_api_key, base_url=settings.transit_base_url
+        )
+        resp = await client.embeddings.create(
+            model=settings.transit_embed_model, input=list(texts)
+        )
+        return [item.embedding for item in resp.data]
+
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     resp = await client.embeddings.create(model=settings.embed_model, input=list(texts))
     return [item.embedding for item in resp.data]

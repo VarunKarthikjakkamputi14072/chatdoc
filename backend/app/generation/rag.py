@@ -48,6 +48,16 @@ def _build_llm(settings: Settings) -> LLM:
             system_prompt=SYSTEM_PROMPT,
             temperature=settings.llm_temperature,
         )
+    if settings.llm_provider == "transit":
+        # Route chat through Transit (NVIDIA NIM, metered + cached). One af_ key
+        # fronts both chat and embeddings; repeated questions hit Transit's cache.
+        return OpenAI(
+            model=settings.transit_model,
+            api_key=settings.transit_api_key,
+            api_base=settings.transit_base_url,
+            system_prompt=SYSTEM_PROMPT,
+            temperature=settings.llm_temperature,
+        )
     return OpenAI(
         model=settings.openai_model,
         api_key=settings.openai_api_key,
